@@ -13,6 +13,8 @@ import sys
 import subprocess
 from pathlib import Path
 
+import httpx
+
 from prompts import (
     scaffold_project_prompts,
     has_project_prompts,
@@ -22,6 +24,22 @@ from prompts import (
 
 # Directory containing generated projects
 GENERATIONS_DIR = Path(__file__).parent / "generations"
+
+OPENCODE_SERVER_URL = "http://127.0.0.1:4096"
+
+
+def check_opencode_server() -> bool:
+    """Return True if the OpenCode server is reachable, else print help and return False."""
+    try:
+        httpx.get(f"{OPENCODE_SERVER_URL}/app", timeout=3)
+        return True
+    except Exception:
+        print("\nError: OpenCode server is not running.")
+        print("Start it in a separate terminal with:")
+        print("  opencode serve")
+        print("\nMake sure OPENCODE_AUTH_TOKEN is set in your .env file.")
+        print("Get your token from: https://opencode.ai/go")
+        return False
 
 
 def check_spec_exists(project_dir: Path) -> bool:
@@ -162,49 +180,8 @@ def ensure_project_scaffolded(project_name: str) -> Path:
 
 
 def run_spec_creation(project_dir: Path) -> bool:
-    """
-    Run Claude Code with /create-spec command to create project specification.
-
-    The project path is passed as an argument so create-spec knows where to write files.
-    """
-    print("\n" + "=" * 50)
-    print("  Project Specification Setup")
-    print("=" * 50)
-    print(f"\nProject directory: {project_dir}")
-    print(f"Prompts will be saved to: {get_project_prompts_dir(project_dir)}")
-    print("\nLaunching Claude Code for interactive spec creation...")
-    print("Answer the questions to define your project.")
-    print("When done, Claude will generate the spec files.")
-    print("Exit Claude Code (Ctrl+C or /exit) when finished.\n")
-
-    try:
-        # Launch Claude Code with /create-spec command
-        # Project path included in command string so it populates $ARGUMENTS
-        subprocess.run(
-            ["claude", f"/create-spec {project_dir}"],
-            check=False,  # Don't raise on non-zero exit
-            cwd=str(Path(__file__).parent)  # Run from project root
-        )
-
-        # Check if spec was created in project prompts directory
-        if check_spec_exists(project_dir):
-            print("\n" + "-" * 50)
-            print("Spec files created successfully!")
-            return True
-        else:
-            print("\n" + "-" * 50)
-            print("Spec creation incomplete.")
-            print(f"Please ensure app_spec.txt exists in: {get_project_prompts_dir(project_dir)}")
-            return False
-
-    except FileNotFoundError:
-        print("\nError: 'claude' command not found.")
-        print("Make sure Claude Code CLI is installed:")
-        print("  npm install -g @anthropic-ai/claude-code")
-        return False
-    except KeyboardInterrupt:
-        print("\n\nSpec creation cancelled.")
-        return False
+    """Redirect to manual spec flow (Claude CLI no longer used)."""
+    return run_manual_spec_flow(project_dir)
 
 
 def run_manual_spec_flow(project_dir: Path) -> bool:
@@ -247,23 +224,23 @@ def run_manual_spec_flow(project_dir: Path) -> bool:
 
 
 def ask_spec_creation_choice() -> str | None:
-    """Ask user whether to create spec with Claude or manually."""
+    """Ask user how to create the project spec."""
     print("\n" + "-" * 40)
     print("  Specification Setup")
     print("-" * 40)
     print("\nHow would you like to define your project?")
-    print("\n[1] Create spec with Claude (recommended)")
-    print("    Interactive conversation to define your project")
-    print("\n[2] Edit templates manually")
+    print("\n[1] Edit templates manually (recommended)")
     print("    Edit the template files directly in your editor")
     print("\n[b] Back to main menu")
     print()
 
     while True:
-        choice = input("Select [1/2/b]: ").strip().lower()
-        if choice in ['1', '2', 'b']:
-            return choice
-        print("Invalid choice. Please enter 1, 2, or b.")
+        choice = input("Select [1/b]: ").strip().lower()
+        if choice == '1':
+            return '2'  # map to manual flow
+        if choice == 'b':
+            return 'b'
+        print("Invalid choice. Please enter 1 or b.")
 
 
 def create_new_project_flow() -> str | None:
@@ -309,6 +286,10 @@ def create_new_project_flow() -> str | None:
 def run_agent(project_name: str) -> None:
     """Run the autonomous agent with the given project."""
     project_dir = GENERATIONS_DIR / project_name
+
+    # Verify OpenCode server is reachable before launching the agent
+    if not check_opencode_server():
+        return
 
     # Final validation before running
     if not has_project_prompts(project_dir):

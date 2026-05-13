@@ -2,16 +2,17 @@
 Agent Session Logic
 ===================
 
-Core agent interaction functions for running autonomous coding sessions.
+Core agent interaction functions for running autonomous coding sessions
+via the OpenCode server (opencode-ai Python SDK).
 """
 
 import asyncio
 from pathlib import Path
 from typing import Optional
 
-from claude_agent_sdk import ClaudeSDKClient
+from opencode_ai import AsyncOpencode
 
-from client import create_client
+from client import create_client, SYSTEM_PROMPT
 from progress import print_session_header, print_progress_summary, has_features
 from prompts import (
     get_initializer_prompt,
@@ -26,70 +27,62 @@ AUTO_CONTINUE_DELAY_SECONDS = 3
 
 
 async def run_agent_session(
-    client: ClaudeSDKClient,
+    client: AsyncOpencode,
     message: str,
     project_dir: Path,
+    model: str,
 ) -> tuple[str, str]:
     """
-    Run a single agent session using Claude Agent SDK.
+    Run a single agent session using the OpenCode server.
+
+    Creates a fresh session for each call (clean context), sends the prompt,
+    and waits for the full response including all tool-use rounds.
 
     Args:
-        client: Claude SDK client
+        client: AsyncOpencode HTTP client
         message: The prompt to send
-        project_dir: Project directory path
+        project_dir: Project directory path (used for display only here)
+        model: Model identifier (e.g. "opencode/deepseek/deepseek-r1-0528")
 
     Returns:
-        (status, response_text) where status is:
-        - "continue" if agent should continue working
-        - "error" if an error occurred
+        (status, response_text) where status is "continue" or "error"
     """
-    print("Sending prompt to Claude Agent SDK...\n")
+    print("Sending prompt to OpenCode server...\n")
 
     try:
-        # Send the query
-        await client.query(message)
+        # Create a fresh session for clean context each iteration
+        session = await client.session.create()
+        session_id = session.id
 
-        # Collect response text and show tool use
+        # Send the prompt; blocks until the model finishes all tool-use rounds
+        msg = await client.session.chat(
+            session_id,
+            parts=[{"type": "text", "text": message}],
+            model=model,
+            system=SYSTEM_PROMPT,
+        )
+
+        # Parse the response parts
         response_text = ""
-        async for msg in client.receive_response():
-            msg_type = type(msg).__name__
+        for part in msg.parts:
+            part_type = getattr(part, "type", None)
 
-            # Handle AssistantMessage (text and tool use)
-            if msg_type == "AssistantMessage" and hasattr(msg, "content"):
-                for block in msg.content:
-                    block_type = type(block).__name__
+            if part_type == "text":
+                text = getattr(part, "text", "")
+                response_text += text
+                print(text, end="", flush=True)
 
-                    if block_type == "TextBlock" and hasattr(block, "text"):
-                        response_text += block.text
-                        print(block.text, end="", flush=True)
-                    elif block_type == "ToolUseBlock" and hasattr(block, "name"):
-                        print(f"\n[Tool: {block.name}]", flush=True)
-                        if hasattr(block, "input"):
-                            input_str = str(block.input)
-                            if len(input_str) > 200:
-                                print(f"   Input: {input_str[:200]}...", flush=True)
-                            else:
-                                print(f"   Input: {input_str}", flush=True)
-
-            # Handle UserMessage (tool results)
-            elif msg_type == "UserMessage" and hasattr(msg, "content"):
-                for block in msg.content:
-                    block_type = type(block).__name__
-
-                    if block_type == "ToolResultBlock":
-                        result_content = getattr(block, "content", "")
-                        is_error = getattr(block, "is_error", False)
-
-                        # Check if command was blocked by security hook
-                        if "blocked" in str(result_content).lower():
-                            print(f"   [BLOCKED] {result_content}", flush=True)
-                        elif is_error:
-                            # Show errors (truncated)
-                            error_str = str(result_content)[:500]
-                            print(f"   [Error] {error_str}", flush=True)
-                        else:
-                            # Tool succeeded - just show brief confirmation
-                            print("   [Done]", flush=True)
+            elif part_type in ("tool-invocation", "tool_use"):
+                tool_name = getattr(part, "toolName", None) or getattr(part, "name", "unknown")
+                print(f"\n[Tool: {tool_name}]", flush=True)
+                tool_input = getattr(part, "input", None) or getattr(part, "args", None)
+                if tool_input:
+                    input_str = str(tool_input)
+                    if len(input_str) > 200:
+                        print(f"   Input: {input_str[:200]}...", flush=True)
+                    else:
+                        print(f"   Input: {input_str}", flush=True)
+                print("   [Done]", flush=True)
 
         print("\n" + "-" * 70 + "\n")
         return "continue", response_text
@@ -109,11 +102,11 @@ async def run_autonomous_agent(
 
     Args:
         project_dir: Directory for the project
-        model: Claude model to use
+        model: Model identifier to use
         max_iterations: Maximum number of iterations (None for unlimited)
     """
     print("\n" + "=" * 70)
-    print("  AUTONOMOUS CODING AGENT DEMO")
+    print("  AUTONOMOUS CODING AGENT")
     print("=" * 70)
     print(f"\nProject directory: {project_dir}")
     print(f"Model: {model}")
@@ -127,8 +120,6 @@ async def run_autonomous_agent(
     project_dir.mkdir(parents=True, exist_ok=True)
 
     # Check if this is a fresh start or continuation
-    # Uses has_features() which checks if the database actually has features,
-    # not just if the file exists (empty db should still trigger initializer)
     is_first_run = not has_features(project_dir)
 
     if is_first_run:
@@ -140,11 +131,13 @@ async def run_autonomous_agent(
         print("  This may appear to hang - it's working. Watch for [Tool: ...] output.")
         print("=" * 70)
         print()
-        # Copy the app spec into the project directory for the agent to read
         copy_spec_to_project(project_dir)
     else:
         print("Continuing existing project")
         print_progress_summary(project_dir)
+
+    # Create the HTTP client once; reuse across all iterations
+    client = create_client(project_dir, model)
 
     # Main loop
     iteration = 0
@@ -152,31 +145,21 @@ async def run_autonomous_agent(
     while True:
         iteration += 1
 
-        # Check max iterations
         if max_iterations and iteration > max_iterations:
             print(f"\nReached max iterations ({max_iterations})")
             print("To continue, run the script again without --max-iterations")
             break
 
-        # Print session header
         print_session_header(iteration, is_first_run)
 
-        # Create client (fresh context)
-        client = create_client(project_dir, model)
-
-        # Choose prompt based on session type
-        # Pass project_dir to enable project-specific prompts
         if is_first_run:
             prompt = get_initializer_prompt(project_dir)
-            is_first_run = False  # Only use initializer once
+            is_first_run = False
         else:
             prompt = get_coding_prompt(project_dir)
 
-        # Run session with async context manager
-        async with client:
-            status, response = await run_agent_session(client, prompt, project_dir)
+        status, response = await run_agent_session(client, prompt, project_dir, model)
 
-        # Handle status
         if status == "continue":
             print(f"\nAgent will auto-continue in {AUTO_CONTINUE_DELAY_SECONDS}s...")
             print_progress_summary(project_dir)
@@ -187,7 +170,6 @@ async def run_autonomous_agent(
             print("Will retry with a fresh session...")
             await asyncio.sleep(AUTO_CONTINUE_DELAY_SECONDS)
 
-        # Small delay between sessions
         if max_iterations is None or iteration < max_iterations:
             print("\nPreparing next session...\n")
             await asyncio.sleep(1)
@@ -199,7 +181,6 @@ async def run_autonomous_agent(
     print(f"\nProject directory: {project_dir}")
     print_progress_summary(project_dir)
 
-    # Print instructions for running the generated application
     print("\n" + "-" * 70)
     print("  TO RUN THE GENERATED APPLICATION:")
     print("-" * 70)

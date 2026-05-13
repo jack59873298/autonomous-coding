@@ -3,13 +3,16 @@
 Autonomous Coding Agent Demo
 ============================
 
-A minimal harness demonstrating long-running autonomous coding with Claude.
-This script implements the two-agent pattern (initializer + coding agent) and
-incorporates all the strategies from the long-running agents guide.
+A minimal harness demonstrating long-running autonomous coding via OpenCode.
+This script implements the two-agent pattern (initializer + coding agent).
+
+Requires the OpenCode server to be running before starting:
+    opencode serve
 
 Example Usage:
-    python autonomous_agent_demo.py --project-dir ./claude_clone_demo
-    python autonomous_agent_demo.py --project-dir ./claude_clone_demo --max-iterations 5
+    python autonomous_agent_demo.py --project-dir ./my_demo
+    python autonomous_agent_demo.py --project-dir ./my_demo --max-iterations 5
+    python autonomous_agent_demo.py --project-dir ./my_demo --model opencode/deepseek/deepseek-chat-v3-0324
 """
 
 import argparse
@@ -26,9 +29,9 @@ load_dotenv()
 from agent import run_autonomous_agent
 
 
-# Configuration
-# DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
-DEFAULT_MODEL = "claude-opus-4-5-20251101"
+# Configuration — must be a model available on your opencode.ai Go subscription
+# Other options: "opencode/deepseek/deepseek-chat-v3-0324", "opencode/qwen/qwen-coder-plus"
+DEFAULT_MODEL = "opencode/deepseek/deepseek-r1-0528"
 
 
 def parse_args() -> argparse.Namespace:
@@ -39,20 +42,20 @@ def parse_args() -> argparse.Namespace:
         epilog="""
 Examples:
   # Start fresh project
-  python autonomous_agent_demo.py --project-dir ./claude_clone
+  python autonomous_agent_demo.py --project-dir ./my_project
 
-  # Use a specific model
-  python autonomous_agent_demo.py --project-dir ./claude_clone --model claude-sonnet-4-5-20250929
+  # Use a different model
+  python autonomous_agent_demo.py --project-dir ./my_project --model opencode/deepseek/deepseek-chat-v3-0324
 
   # Limit iterations for testing
-  python autonomous_agent_demo.py --project-dir ./claude_clone --max-iterations 5
+  python autonomous_agent_demo.py --project-dir ./my_project --max-iterations 5
 
   # Continue existing project
-  python autonomous_agent_demo.py --project-dir ./claude_clone
+  python autonomous_agent_demo.py --project-dir ./my_project
 
 Authentication:
-  Uses Claude CLI credentials from ~/.claude/.credentials.json
-  Run 'claude login' to authenticate (handled by start.bat/start.sh)
+  Set OPENCODE_AUTH_TOKEN in your .env file (from https://opencode.ai/go dashboard).
+  The OpenCode server must be running: opencode serve
         """,
     )
 
@@ -74,7 +77,7 @@ Authentication:
         "--model",
         type=str,
         default=DEFAULT_MODEL,
-        help=f"Claude model to use (default: {DEFAULT_MODEL})",
+        help=f"OpenCode model to use (default: {DEFAULT_MODEL})",
     )
 
     return parser.parse_args()
@@ -84,8 +87,8 @@ def main() -> None:
     """Main entry point."""
     args = parse_args()
 
-    # Note: Authentication is handled by start.bat/start.sh before this script runs.
-    # The Claude SDK auto-detects credentials from ~/.claude/.credentials.json
+    # Authentication: OPENCODE_AUTH_TOKEN read from .env file by load_dotenv() above.
+    # The OpenCode server must already be running (opencode serve).
 
     # Automatically place projects in generations/ directory unless already specified
     project_dir = args.project_dir

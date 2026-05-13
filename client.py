@@ -1,165 +1,42 @@
 """
-Claude SDK Client Configuration
-===============================
+OpenCode Client Configuration
+==============================
 
-Functions for creating and configuring the Claude Agent SDK client.
+Factory for creating the opencode-ai async client.
+The OpenCode server must be running before any calls are made
+(start it with: opencode serve).
+
+Authentication uses OPENCODE_AUTH_TOKEN from the environment (.env file).
+MCP servers (playwright, features) are configured in opencode.jsonc.
 """
 
-import json
 import os
-import sys
 from pathlib import Path
 
-from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
-from claude_agent_sdk.types import HookMatcher
-
-from security import bash_security_hook
+from opencode_ai import AsyncOpencode
 
 
-# Feature MCP tools for feature/test management
-FEATURE_MCP_TOOLS = [
-    "mcp__features__feature_get_stats",
-    "mcp__features__feature_get_next",
-    "mcp__features__feature_get_for_regression",
-    "mcp__features__feature_mark_passing",
-    "mcp__features__feature_skip",
-    "mcp__features__feature_create_bulk",
-]
-
-# Playwright MCP tools for browser automation
-PLAYWRIGHT_TOOLS = [
-    # Core navigation & screenshots
-    "mcp__playwright__browser_navigate",
-    "mcp__playwright__browser_navigate_back",
-    "mcp__playwright__browser_take_screenshot",
-    "mcp__playwright__browser_snapshot",
-
-    # Element interaction
-    "mcp__playwright__browser_click",
-    "mcp__playwright__browser_type",
-    "mcp__playwright__browser_fill_form",
-    "mcp__playwright__browser_select_option",
-    "mcp__playwright__browser_hover",
-    "mcp__playwright__browser_drag",
-    "mcp__playwright__browser_press_key",
-
-    # JavaScript & debugging
-    "mcp__playwright__browser_evaluate",
-    "mcp__playwright__browser_run_code",
-    "mcp__playwright__browser_console_messages",
-    "mcp__playwright__browser_network_requests",
-
-    # Browser management
-    "mcp__playwright__browser_close",
-    "mcp__playwright__browser_resize",
-    "mcp__playwright__browser_tabs",
-    "mcp__playwright__browser_wait_for",
-    "mcp__playwright__browser_handle_dialog",
-    "mcp__playwright__browser_file_upload",
-    "mcp__playwright__browser_install",
-]
-
-# Built-in tools
-BUILTIN_TOOLS = [
-    "Read",
-    "Write",
-    "Edit",
-    "Glob",
-    "Grep",
-    "Bash",
-]
+SYSTEM_PROMPT = (
+    "You are an expert full-stack developer building a production-quality web application."
+)
 
 
-def create_client(project_dir: Path, model: str):
+def create_client(project_dir: Path, model: str) -> AsyncOpencode:
     """
-    Create a Claude Agent SDK client with multi-layered security.
+    Create an AsyncOpencode client connected to the local OpenCode server.
 
-    Args:
-        project_dir: Directory for the project
-        model: Claude model to use
+    The OpenCode server must already be running on port 4096.
+    Start it with: opencode serve
 
-    Returns:
-        Configured ClaudeSDKClient (from claude_agent_sdk)
-
-    Security layers (defense in depth):
-    1. Sandbox - OS-level bash command isolation prevents filesystem escape
-    2. Permissions - File operations restricted to project_dir only
-    3. Security hooks - Bash commands validated against an allowlist
-       (see security.py for ALLOWED_COMMANDS)
-
-    Note: Authentication is handled by start.bat/start.sh before this runs.
-    The Claude SDK auto-detects credentials from ~/.claude/.credentials.json
+    PROJECT_DIR is set in the environment so the features MCP server
+    (spawned by OpenCode) knows which project database to use.
     """
-    # Create comprehensive security settings
-    # Note: Using relative paths ("./**") restricts access to project directory
-    # since cwd is set to project_dir
-    security_settings = {
-        "sandbox": {"enabled": True, "autoAllowBashIfSandboxed": True},
-        "permissions": {
-            "defaultMode": "acceptEdits",  # Auto-approve edits within allowed directories
-            "allow": [
-                # Allow all file operations within the project directory
-                "Read(./**)",
-                "Write(./**)",
-                "Edit(./**)",
-                "Glob(./**)",
-                "Grep(./**)",
-                # Bash permission granted here, but actual commands are validated
-                # by the bash_security_hook (see security.py for allowed commands)
-                "Bash(*)",
-                # Allow Playwright MCP tools for browser automation
-                *PLAYWRIGHT_TOOLS,
-                # Allow Feature MCP tools for feature management
-                *FEATURE_MCP_TOOLS,
-            ],
-        },
-    }
+    os.environ["PROJECT_DIR"] = str(project_dir.resolve())
 
-    # Ensure project directory exists before creating settings file
-    project_dir.mkdir(parents=True, exist_ok=True)
-
-    # Write settings to a file in the project directory
-    settings_file = project_dir / ".claude_settings.json"
-    with open(settings_file, "w") as f:
-        json.dump(security_settings, f, indent=2)
-
-    print(f"Created security settings at {settings_file}")
-    print("   - Sandbox enabled (OS-level bash isolation)")
-    print(f"   - Filesystem restricted to: {project_dir.resolve()}")
-    print("   - Bash commands restricted to allowlist (see security.py)")
-    print("   - MCP servers: playwright (browser), features (database)")
-    print("   - Project settings enabled (skills, commands, CLAUDE.md)")
+    print(f"Connecting to OpenCode server at http://127.0.0.1:4096")
+    print(f"   Project directory: {project_dir.resolve()}")
+    print(f"   Model: {model}")
+    print(f"   MCP servers: playwright (browser), features (database)")
     print()
 
-    return ClaudeSDKClient(
-        options=ClaudeAgentOptions(
-            model=model,
-            system_prompt="You are an expert full-stack developer building a production-quality web application.",
-            setting_sources=["project"],  # Enable skills, commands, and CLAUDE.md from project dir
-            max_buffer_size=10 * 1024 * 1024,  # 10MB for large Playwright screenshots
-            allowed_tools=[
-                *BUILTIN_TOOLS,
-                *PLAYWRIGHT_TOOLS,
-                *FEATURE_MCP_TOOLS,
-            ],
-            mcp_servers={
-                "playwright": {"command": "npx", "args": ["@playwright/mcp@latest", "--viewport-size", "1280x720"]},
-                "features": {
-                    "command": sys.executable,  # Use the same Python that's running this script
-                    "args": ["-m", "mcp_server.feature_mcp"],
-                    "env": {
-                        "PROJECT_DIR": str(project_dir.resolve()),
-                        "PYTHONPATH": str(Path(__file__).parent.resolve()),
-                    },
-                },
-            },
-            hooks={
-                "PreToolUse": [
-                    HookMatcher(matcher="Bash", hooks=[bash_security_hook]),
-                ],
-            },
-            max_turns=1000,
-            cwd=str(project_dir.resolve()),
-            settings=str(settings_file.resolve()),  # Use absolute path
-        )
-    )
+    return AsyncOpencode(base_url="http://127.0.0.1:4096")

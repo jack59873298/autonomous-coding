@@ -1,0 +1,22 @@
+{
+  // OpenCode configuration for autonomous-coding agent
+  // Docs: https://opencode.ai/docs/config
+  "$schema": "https://opencode.ai/config.schema.json",
+
+  // Go subscription model — change to any model available on your plan
+  // Other options: "opencode/deepseek/deepseek-chat-v3-0324", "opencode/qwen/qwen-coder-plus"
+  "model": "opencode/deepseek/deepseek-r1-0528",
+
+  "mcp": {
+    // Browser automation via Playwright
+    "playwright": {
+      "type": "local",
+      "command": ["npx", "-y", "@playwright/mcp@latest", "--viewport-size", "1280x720"]
+    },
+    // Feature/test tracking database (PROJECT_DIR inherited from environment)
+    "features": {
+      "type": "local",
+      "command": ["python", "-m", "mcp_server.feature_mcp"]
+    }
+  }
+}
