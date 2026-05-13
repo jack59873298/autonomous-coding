@@ -10,9 +10,7 @@ import asyncio
 from pathlib import Path
 from typing import Optional
 
-from opencode_ai import AsyncOpencode
-
-from client import create_client, SYSTEM_PROMPT
+from client import OpencodeClient, create_client
 from progress import print_session_header, print_progress_summary, has_features
 from prompts import (
     get_initializer_prompt,
@@ -27,7 +25,7 @@ AUTO_CONTINUE_DELAY_SECONDS = 3
 
 
 async def run_agent_session(
-    client: AsyncOpencode,
+    client: OpencodeClient,
     message: str,
     project_dir: Path,
     model: str,
@@ -38,50 +36,31 @@ async def run_agent_session(
     Creates a fresh session for each call (clean context), sends the prompt,
     and waits for the full response including all tool-use rounds.
 
-    Args:
-        client: AsyncOpencode HTTP client
-        message: The prompt to send
-        project_dir: Project directory path (used for display only here)
-        model: Model identifier (e.g. "opencode/deepseek/deepseek-r1-0528")
-
     Returns:
         (status, response_text) where status is "continue" or "error"
     """
     print("Sending prompt to OpenCode server...\n")
 
     try:
-        # Create a fresh session for clean context each iteration
-        session = await client.session.create()
-        session_id = session.id
+        session_id = await client.create_session()
+        parts = await client.chat(session_id, message, model)
 
-        # Send the prompt; blocks until the model finishes all tool-use rounds
-        msg = await client.session.chat(
-            session_id,
-            parts=[{"type": "text", "text": message}],
-            model=model,
-            system=SYSTEM_PROMPT,
-        )
-
-        # Parse the response parts
         response_text = ""
-        for part in msg.parts:
-            part_type = getattr(part, "type", None)
+        for part in parts:
+            part_type = part.get("type")
 
             if part_type == "text":
-                text = getattr(part, "text", "")
+                text = part.get("text", "")
                 response_text += text
                 print(text, end="", flush=True)
 
-            elif part_type in ("tool-invocation", "tool_use"):
-                tool_name = getattr(part, "toolName", None) or getattr(part, "name", "unknown")
+            elif part_type in ("tool-invocation", "tool-call", "tool_use"):
+                tool_name = part.get("toolName") or part.get("name", "unknown")
                 print(f"\n[Tool: {tool_name}]", flush=True)
-                tool_input = getattr(part, "input", None) or getattr(part, "args", None)
+                tool_input = part.get("input") or part.get("args")
                 if tool_input:
                     input_str = str(tool_input)
-                    if len(input_str) > 200:
-                        print(f"   Input: {input_str[:200]}...", flush=True)
-                    else:
-                        print(f"   Input: {input_str}", flush=True)
+                    print(f"   Input: {input_str[:200]}{'...' if len(input_str) > 200 else ''}", flush=True)
                 print("   [Done]", flush=True)
 
         print("\n" + "-" * 70 + "\n")

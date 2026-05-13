@@ -3,9 +3,9 @@
   // Docs: https://opencode.ai/docs/config
   "$schema": "https://opencode.ai/config.schema.json",
 
-  // Go subscription model — change to any model available on your plan
-  // Other options: "opencode/deepseek/deepseek-chat-v3-0324", "opencode/qwen/qwen-coder-plus"
-  "model": "opencode/deepseek/deepseek-r1-0528",
+  // Go subscription model — format is "providerID/modelID"
+  // Other options: "opencode/big-pickle", "opencode/minimax-m2.5-free"
+  "model": "opencode/deepseek-v4-flash-free",
 
   "mcp": {
     // Browser automation via Playwright

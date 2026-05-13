@@ -1,0 +1,7 @@
+{
+  "tool_name": "PowerShell",
+  "tool_input_preview": "{\"command\":\"cd \\\"e:\\\\OneDrive\\\\Downloads\\\\Apps\\\\autocoder\\\\autocoder\\\"; python _test_connection.py\",\"description\":\"Run full SDK end-to-end test\"}",
+  "error": "Exit code 1\n[1] Session created: ses_1dee6c9deffe9UWVyXvcLwCoGJ\r\n[2] Sending prompt...\r\nTraceback (most recent call last):\r\n  File \"E:\\OneDrive\\Downloads\\Apps\\autocoder\\autocoder\\_test_connection.py\", line 41, in <module>\r\n    asyncio.run(test())\r\n    ~~~~~~~~~~~^^^^^^^^\r\n  File \"C:\\Users\\ge430\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\asyncio\\runners.py\", line 195, in run\r\n    return runner.run(main)\r\n           ~~~~~~~~~~^^^^^^\r\n  File \"C:\\Users\\ge430\\AppData\\Local\\Programs\\Python\\Python313\\...",
+  "timestamp": "2026-05-13T11:29:21.534Z",
+  "retry_count": 1
+}

@@ -29,9 +29,9 @@ load_dotenv()
 from agent import run_autonomous_agent
 
 
-# Configuration — must be a model available on your opencode.ai Go subscription
-# Other options: "opencode/deepseek/deepseek-chat-v3-0324", "opencode/qwen/qwen-coder-plus"
-DEFAULT_MODEL = "opencode/deepseek/deepseek-r1-0528"
+# Configuration — format is "providerID/modelID"
+# Available Go subscription models: deepseek-v4-flash-free, big-pickle, minimax-m2.5-free
+DEFAULT_MODEL = "opencode/deepseek-v4-flash-free"
 
 
 def parse_args() -> argparse.Namespace:
