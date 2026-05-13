@@ -30,8 +30,9 @@ from agent import run_autonomous_agent
 
 
 # Configuration — format is "providerID/modelID"
-# Available Go subscription models: deepseek-v4-flash-free, big-pickle, minimax-m2.5-free
-DEFAULT_MODEL = "opencode/deepseek-v4-flash-free"
+# Go paid: opencode-go/deepseek-v4-pro, opencode-go/deepseek-v4-flash, opencode-go/kimi-k2.6
+# Go free: opencode/deepseek-v4-flash-free, opencode/big-pickle
+DEFAULT_MODEL = "opencode-go/deepseek-v4-pro"
 
 
 def parse_args() -> argparse.Namespace:

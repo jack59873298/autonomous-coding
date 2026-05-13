@@ -1,0 +1,121 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1778673484948,
+  "projectRoot": "e:\\OneDrive\\Downloads\\Apps\\autocoder\\autocoder",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Python",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "requirements.txt"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "pip",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "api": {
+      "path": "api",
+      "purpose": "API routes",
+      "fileCount": 3,
+      "lastAccessed": 1778673484918,
+      "keyFiles": [
+        "database.py",
+        "migration.py",
+        "__init__.py"
+      ]
+    },
+    "generations": {
+      "path": "generations",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778673484919,
+      "keyFiles": []
+    },
+    "mcp_server": {
+      "path": "mcp_server",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1778673484919,
+      "keyFiles": [
+        "feature_mcp.py",
+        "__init__.py"
+      ]
+    },
+    "__pycache__": {
+      "path": "__pycache__",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1778673484920,
+      "keyFiles": [
+        "client.cpython-313.pyc",
+        "prompts.cpython-313.pyc",
+        "security.cpython-313.pyc",
+        "start.cpython-313.pyc"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "start.py",
+      "accessCount": 3,
+      "lastAccessed": 1778694514941,
+      "type": "file"
+    },
+    {
+      "path": "generations\\Pomodoro Timer\\prompts\\app_spec.txt",
+      "accessCount": 2,
+      "lastAccessed": 1778674811189,
+      "type": "file"
+    },
+    {
+      "path": "generations\\Pomodoro Timer\\prompts\\initializer_prompt.md",
+      "accessCount": 1,
+      "lastAccessed": 1778674715882,
+      "type": "file"
+    },
+    {
+      "path": "autonomous_agent_demo.py",
+      "accessCount": 1,
+      "lastAccessed": 1778675110072,
+      "type": "file"
+    },
+    {
+      "path": "_test_fixes.py",
+      "accessCount": 1,
+      "lastAccessed": 1778689806330,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\ge430\\AppData\\Roaming\\npm\\opencode.ps1",
+      "accessCount": 1,
+      "lastAccessed": 1778694104397,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

@@ -1,75 +1,72 @@
 # Autonomous Coding Agent
 
-A long-running autonomous coding agent powered by the Claude Agent SDK. This tool can build complete applications over multiple sessions using a two-agent pattern (initializer + coding agent).
+A long-running autonomous coding agent powered by [OpenCode](https://opencode.ai). Builds complete applications over multiple sessions using a two-agent pattern (initializer + coding agent).
 
-## Video Walkthrough
-
-[![Watch the video](https://img.youtube.com/vi/YW09hhnVqNM/maxresdefault.jpg)](https://youtu.be/YW09hhnVqNM)
-
-> **[Watch the setup and usage guide →](https://youtu.be/YW09hhnVqNM)**
+> Originally based on [leonvanzyl/autonomous-coding](https://github.com/leonvanzyl/autonomous-coding), ported from the Anthropic Claude Agent SDK to OpenCode with Go subscription support.
 
 ---
 
 ## Prerequisites
 
-### Claude Code CLI (Required)
+### 1. OpenCode CLI
 
-This project requires the Claude Code CLI to be installed. Install it using one of these methods:
+Install the OpenCode CLI:
 
-**macOS / Linux:**
-```bash
-curl -fsSL https://claude.ai/install.sh | bash
-```
-
-**Windows (PowerShell):**
 ```powershell
-irm https://claude.ai/install.ps1 | iex
+npm install -g opencode-ai
 ```
 
-### Authentication
+### 2. OpenCode Go Subscription
 
-You need one of the following:
+Sign up at [opencode.ai/go](https://opencode.ai/go) ($5 first month, $10/month).
 
-- **Claude Pro/Max Subscription** - Use `claude login` to authenticate (recommended)
-- **Anthropic API Key** - Pay-per-use from https://console.anthropic.com/
+Log in to configure your credentials:
+
+```powershell
+opencode providers login
+```
+
+### 3. Python 3.8+
+
+Required Python packages are listed in `requirements.txt`.
 
 ---
 
 ## Quick Start
 
-### 1. Clone the Repository
+### 1. Install Python dependencies
 
-```bash
-git clone https://github.com/your-repo/autonomous-coding.git
-cd autonomous-coding
+```powershell
+pip install -r requirements.txt
 ```
 
-### 2. Run the Start Script
+### 2. Configure your token
 
-**Windows:**
-```cmd
-start.bat
+Copy `.env.example` to `.env` and set your OpenCode auth token:
+
+```
+OPENCODE_AUTH_TOKEN=your_token_here
 ```
 
-**macOS / Linux:**
-```bash
-./start.sh
+Get your token from [opencode.ai/go](https://opencode.ai/go).
+
+### 3. Start the OpenCode server
+
+In a **separate terminal**, run:
+
+```powershell
+opencode serve --port 4096
 ```
 
-The start script will:
-1. Check if Claude CLI is installed
-2. Check if you're authenticated (prompt to run `claude login` if not)
-3. Create a Python virtual environment
-4. Install dependencies
-5. Launch the main menu
+Keep this terminal open while the agent runs.
 
-### 3. Create or Continue a Project
+### 4. Run the agent
 
-You'll see a menu with options to:
-- **Create new project** - Start a fresh project with AI-assisted spec generation
-- **Continue existing project** - Resume work on a previous project
+```powershell
+python start.py
+```
 
-For new projects, you can use the built-in `/create-spec` command to interactively create your app specification with Claude's help.
+You'll see a menu to create a new project or continue an existing one.
 
 ---
 
@@ -77,70 +74,84 @@ For new projects, you can use the built-in `/create-spec` command to interactive
 
 ### Two-Agent Pattern
 
-1. **Initializer Agent (First Session):** Reads your app specification, creates a `feature_list.json` with test cases, sets up the project structure, and initializes git.
+1. **Initializer Agent (First Session):** Reads your app specification, creates a `feature_list.json` with test cases, and sets up the project structure.
 
 2. **Coding Agent (Subsequent Sessions):** Picks up where the previous session left off, implements features one by one, and marks them as passing in `feature_list.json`.
 
 ### Session Management
 
-- Each session runs with a fresh context window
+- Each session creates a fresh OpenCode session (clean context window)
 - Progress is persisted via `feature_list.json` and git commits
 - The agent auto-continues between sessions (3 second delay)
-- Press `Ctrl+C` to pause; run the start script again to resume
+- Press `Ctrl+C` to pause; run `python start.py` again to resume
 
 ---
 
-## Important Timing Expectations
+## Model Selection
 
-> **Note: Building complete applications takes time!**
+When you start a project, the app fetches available models live from the OpenCode server and lets you pick:
 
-- **First session (initialization):** The agent generates feature test cases. This takes several minutes and may appear to hang - this is normal.
+```
+  -- Go subscription (paid) --
+  [1] opencode-go/deepseek-v4-flash
+  [2] opencode-go/deepseek-v4-pro  (default)
+  [3] opencode-go/kimi-k2.6
+  ...
 
-- **Subsequent sessions:** Each coding iteration can take **5-15 minutes** depending on complexity.
+  -- Free tier --
+  [13] opencode/deepseek-v4-flash-free
+  ...
+```
 
-- **Full app:** Building all features typically requires **many hours** of total runtime across multiple sessions.
+Recommended for coding: **deepseek-v4-pro** (default) or **deepseek-v4-flash** for faster/cheaper runs.
 
-**Tip:** The feature count in the prompts determines scope. For faster demos, you can modify your app spec to target fewer features (e.g., 20-50 features for a quick demo).
+---
+
+## Timing Expectations
+
+- **First session (initialization):** Generates feature test cases. Takes several minutes and may appear to hang — this is normal. Watch for `[Tool: ...]` output.
+- **Subsequent sessions:** Each coding iteration takes **5–15 minutes** depending on complexity.
+- **Full app:** Building all features typically requires **many hours** across multiple sessions.
+
+For faster demos, target fewer features in your app spec (20–50 instead of 200).
 
 ---
 
 ## Project Structure
 
 ```
-autonomous-coding/
-├── start.bat                 # Windows start script
-├── start.sh                  # macOS/Linux start script
+autocoder/
 ├── start.py                  # Main menu and project management
-├── autonomous_agent_demo.py  # Agent entry point
-├── agent.py                  # Agent session logic
-├── client.py                 # Claude SDK client configuration
-├── security.py               # Bash command allowlist and validation
-├── progress.py               # Progress tracking utilities
+├── autonomous_agent_demo.py  # Agent entry point and CLI
+├── agent.py                  # Agent session loop logic
+├── client.py                 # OpenCode HTTP client wrapper
+├── progress.py               # Feature progress tracking (SQLite)
 ├── prompts.py                # Prompt loading utilities
+├── security.py               # Bash command allowlist (reference)
+├── opencode.jsonc            # OpenCode server config (model + MCP)
+├── mcp_server/
+│   └── feature_mcp.py       # MCP server for feature tracking tools
 ├── .claude/
-│   ├── commands/
-│   │   └── create-spec.md    # Interactive spec creation command
-│   └── templates/            # Prompt templates
-├── generations/              # Generated projects go here
+│   └── commands/
+│       └── create-spec.md   # Spec creation prompt template
+├── generations/              # Generated projects land here
 ├── requirements.txt          # Python dependencies
-└── .env                      # Optional configuration (N8N webhook)
+├── .env.example              # Environment variable template
+└── .env                      # Your credentials (not committed)
 ```
 
 ---
 
 ## Generated Project Structure
 
-After the agent runs, your project directory will contain:
-
 ```
 generations/my_project/
-├── feature_list.json         # Test cases (source of truth)
+├── feature_list.json         # Test cases (source of truth for progress)
 ├── prompts/
 │   ├── app_spec.txt          # Your app specification
 │   ├── initializer_prompt.md # First session prompt
 │   └── coding_prompt.md      # Continuation session prompt
-├── init.sh                   # Environment setup script
-├── claude-progress.txt       # Session progress notes
+├── init.sh                   # Environment setup script (created by agent)
 └── [application files]       # Generated application code
 ```
 
@@ -148,95 +159,60 @@ generations/my_project/
 
 ## Running the Generated Application
 
-After the agent completes (or pauses), you can run the generated application:
-
 ```bash
 cd generations/my_project
-
-# Run the setup script created by the agent
-./init.sh
-
-# Or manually (typical for Node.js apps):
-npm install
-npm run dev
+./init.sh          # Run setup script created by the agent
+# Or manually:
+npm install && npm run dev
 ```
 
-The application will typically be available at `http://localhost:3000` or similar.
+The app will typically be available at `http://localhost:3000`.
 
 ---
 
-## Security Model
+## Configuration
 
-This project uses a defense-in-depth security approach (see `security.py` and `client.py`):
+### opencode.jsonc
 
-1. **OS-level Sandbox:** Bash commands run in an isolated environment
-2. **Filesystem Restrictions:** File operations restricted to the project directory only
-3. **Bash Allowlist:** Only specific commands are permitted:
-   - File inspection: `ls`, `cat`, `head`, `tail`, `wc`, `grep`
-   - Node.js: `npm`, `node`
-   - Version control: `git`
-   - Process management: `ps`, `lsof`, `sleep`, `pkill` (dev processes only)
+Controls which model and MCP servers the OpenCode server uses:
 
-Commands not in the allowlist are blocked by the security hook.
-
----
-
-## Configuration (Optional)
-
-### N8N Webhook Integration
-
-The agent can send progress notifications to an N8N webhook. Create a `.env` file:
-
-```bash
-# Optional: N8N webhook for progress notifications
-PROGRESS_N8N_WEBHOOK_URL=https://your-n8n-instance.com/webhook/your-webhook-id
-```
-
-When test progress increases, the agent sends:
-
-```json
+```jsonc
 {
-  "event": "test_progress",
-  "passing": 45,
-  "total": 200,
-  "percentage": 22.5,
-  "project": "my_project",
-  "timestamp": "2025-01-15T14:30:00.000Z"
+  "model": "opencode-go/deepseek-v4-pro",
+  "mcp": {
+    "playwright": { "type": "local", "command": ["npx", "-y", "@playwright/mcp@latest"] },
+    "features":   { "type": "local", "command": ["python", "-m", "mcp_server.feature_mcp"] }
+  }
 }
 ```
 
----
+### N8N Webhook (optional)
 
-## Customization
+Add to `.env` to receive progress notifications:
 
-### Changing the Application
-
-Use the `/create-spec` command when creating a new project, or manually edit the files in your project's `prompts/` directory:
-- `app_spec.txt` - Your application specification
-- `initializer_prompt.md` - Controls feature generation
-
-### Modifying Allowed Commands
-
-Edit `security.py` to add or remove commands from `ALLOWED_COMMANDS`.
+```
+PROGRESS_N8N_WEBHOOK_URL=https://your-n8n-instance.com/webhook/your-id
+```
 
 ---
 
 ## Troubleshooting
 
-**"Claude CLI not found"**
-Install the Claude Code CLI using the instructions in the Prerequisites section.
+**"OpenCode server is not running"**
+Start it in a separate terminal: `opencode serve --port 4096`
 
-**"Not authenticated with Claude"**
-Run `claude login` to authenticate. The start script will prompt you to do this automatically.
+**"Failed to start server on port 4096"**
+Port is already in use. Kill the process:
+```powershell
+Get-NetTCPConnection -LocalPort 4096 | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+```
+Then run `opencode serve --port 4096` again.
+
+**"Error during agent session" (repeated)**
+Check the full traceback printed below the error. Common causes:
+- Model rate limit hit — wait a minute and retry
+- Session timeout — the default has no read timeout so this should be rare
+- Network issue to OpenCode server
 
 **"Appears to hang on first run"**
-This is normal. The initializer agent is generating detailed test cases, which takes significant time. Watch for `[Tool: ...]` output to confirm the agent is working.
-
-**"Command blocked by security hook"**
-The agent tried to run a command not in the allowlist. This is the security system working as intended. If needed, add the command to `ALLOWED_COMMANDS` in `security.py`.
-
----
-
-## License
-
-Internal Anthropic use.
+Normal — the initializer is generating test cases. Watch for `[Tool: ...]` output to confirm it's working.

@@ -7,10 +7,11 @@ via the OpenCode server (opencode-ai Python SDK).
 """
 
 import asyncio
+import traceback
 from pathlib import Path
 from typing import Optional
 
-from client import OpencodeClient, create_client
+from client import OpencodeClient, SYSTEM_PROMPT, create_client
 from progress import print_session_header, print_progress_summary, has_features
 from prompts import (
     get_initializer_prompt,
@@ -67,8 +68,9 @@ async def run_agent_session(
         return "continue", response_text
 
     except Exception as e:
-        print(f"Error during agent session: {e}")
-        return "error", str(e)
+        print(f"Error during agent session: {type(e).__name__}: {e}")
+        print(traceback.format_exc())
+        return "error", repr(e)
 
 
 async def run_autonomous_agent(
@@ -133,20 +135,19 @@ async def run_autonomous_agent(
 
         if is_first_run:
             prompt = get_initializer_prompt(project_dir)
-            is_first_run = False
         else:
             prompt = get_coding_prompt(project_dir)
 
         status, response = await run_agent_session(client, prompt, project_dir, model)
 
         if status == "continue":
+            is_first_run = False  # only advance past initializer on success
             print(f"\nAgent will auto-continue in {AUTO_CONTINUE_DELAY_SECONDS}s...")
             print_progress_summary(project_dir)
             await asyncio.sleep(AUTO_CONTINUE_DELAY_SECONDS)
 
         elif status == "error":
-            print("\nSession encountered an error")
-            print("Will retry with a fresh session...")
+            print("\nSession encountered an error. Will retry...")
             await asyncio.sleep(AUTO_CONTINUE_DELAY_SECONDS)
 
         if max_iterations is None or iteration < max_iterations:
